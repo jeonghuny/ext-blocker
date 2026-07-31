@@ -1,0 +1,41 @@
+server:
+  port: ${PORT:8080}          # Railway가 PORT를 주입함. 로컬은 8080
+
+spring:
+  application:
+    name: ext-blocker
+
+  datasource:
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:extblocker}
+    username: ${PGUSER:postgres}
+    password: ${PGPASSWORD:postgres}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate       # Flyway가 만든 스키마와 엔티티가 맞는지 검증만
+    open-in-view: false        # 경고 로그 제거 + 안티패턴 회피
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+  servlet:
+    multipart:
+      max-file-size: 100MB     # 측정용. 측정 끝나면 실제 정책값으로 낮춤
+      max-request-size: 100MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never      # 공개 배포이므로 내부 정보 노출 금지
+
+logging:
+  level:
+    org.springframework.web.multipart: DEBUG
