@@ -54,7 +54,7 @@ public class FileNameNormalizer {
         int end = s.length();
         while (end > 0) {
             char c = s.charAt(end - 1);
-            if (c != '.' && c != ' ') break;
+            if (c != '.' && !Character.isSpaceChar(c) && c != '\t') break;
             end--;
         }
         return s.substring(0, end);

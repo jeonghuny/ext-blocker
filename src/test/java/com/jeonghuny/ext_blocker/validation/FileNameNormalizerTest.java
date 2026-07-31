@@ -227,4 +227,12 @@ class FileNameNormalizerTest {
         assertThat(r.original()).isEqualTo("FILE.EXE. ");
         assertThat(r.sanitized()).isEqualTo("FILE.EXE");
     }
+
+    @Test
+    @DisplayName("[적대적 테스트 발견] NBSP 등 유니코드 공백류도 후행 제거한다")
+    void 유니코드_공백_후행() {
+        var r = normalizer.normalize("file.exe\u00A0");
+        assertThat(r.sanitized()).isEqualTo("file.exe");
+        assertThat(r.extensionSegments()).containsExactly("exe");
+    }
 }
