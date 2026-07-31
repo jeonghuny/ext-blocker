@@ -55,6 +55,14 @@
         <div id="tags" class="tags"><span class="empty">불러오는 중…</span></div>
         <div id="msg" class="msg"></div>
     </section>
+    <section>
+        <h2>파일 업로드 테스트</h2>
+        <div class="row">
+            <input type="file" id="file" style="flex:1">
+            <button id="upload">업로드</button>
+        </div>
+        <div id="upMsg" class="msg"></div>
+    </section>
 </main>
 
 <script>
@@ -184,6 +192,40 @@
     $('add').addEventListener('click', addCustom);
     $('input').addEventListener('keydown', e => { if (e.key === 'Enter') addCustom(); });
     load();
+        const MAX_BYTES = 10 * 1024 * 1024;
+
+    function showUpMsg(text, type) {
+      const el = $('upMsg');
+      el.textContent = text;
+      el.className = 'msg ' + type;
+    }
+
+    $('upload').addEventListener('click', async () => {
+      const f = $('file').files[0];
+      if (!f) { showUpMsg('파일을 선택해 주세요.', 'error'); return; }
+
+      // 서버가 Content-Length만 보고 스트림을 취소하므로(실측),
+      // 브라우저는 413 본문을 읽지 못할 수 있다 → 클라이언트에서 선제 차단
+      if (f.size > MAX_BYTES) {
+        showUpMsg(`파일이 너무 큽니다. (${(f.size/1048576).toFixed(1)}MB / 최대 10MB)`, 'error');
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('file', f);
+      $('upload').disabled = true;
+      showUpMsg('업로드 중…', 'info');
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const body = await res.json();
+        showUpMsg(body.message, res.ok ? 'info' : 'error');
+      } catch (e) {
+        showUpMsg('업로드에 실패했습니다. 네트워크 상태를 확인해 주세요.', 'error');
+      } finally {
+        $('upload').disabled = false;
+      }
+    });
 </script>
 </body>
 </html>
