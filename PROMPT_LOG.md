@@ -43,4 +43,12 @@ content-length: 160
 x-hikari-trace: hnd1.df23
 x-railway-edge: hnd1
 
-{"originalFilename":"test_10mb.bin","declaredContentType":"application/octet-stream","size":0,"savedPath":"/tmp/probe/2206fb35-fc28-432d-9733-ad68932b8d7d.bin"}%      
+{"originalFilename":"test_10mb.bin","declaredContentType":"application/octet-stream","size":0,"savedPath":"/tmp/probe/2206fb35-fc28-432d-9733-ad68932b8d7d.bin"}%
+
+kjh@kjhui-MacBookPro ext-blocker-probe % dd if=/dev/urandom of=test_9mb.bin bs=1m count=9 2>/dev/null
+kjh@kjhui-MacBookPro ext-blocker-probe % curl -sS -w '\n%{http_code} %{time_total}s\n' -F "file=@test_9mb.bin" \
+$BASE/api/probe/upload | jq -c '{size}' 2>/dev/null
+{"size":9437184}
+kjh@kjhui-MacBookPro ext-blocker-probe % curl -sS -F "file=@test.txt;filename=\"photo$(printf '\u202e')gnp.exe\"" \
+$BASE/api/probe/upload | jq -r .originalFilename | xxd | head -2
+00000000: 7068 6f74 6fe2 80ae 676e 702e 6578 650a  photo...gnp.exe.
