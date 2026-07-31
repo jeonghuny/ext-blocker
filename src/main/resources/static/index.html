@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>파일 확장자 차단</title>
+    <style>
+        :root { --line:#d8d8d8; --muted:#666; --danger:#c0392b; --bg:#fafafa; }
+        * { box-sizing: border-box; }
+        body { font: 15px/1.6 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+               margin: 0; padding: 32px 20px; color: #222; }
+        main { max-width: 720px; margin: 0 auto; }
+        h1 { font-size: 20px; margin: 0 0 4px; }
+        .desc { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
+        section { border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; margin-bottom: 20px; }
+        h2 { font-size: 15px; margin: 0 0 14px; }
+        .fixed-list { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+        .fixed-list label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .row { display: flex; gap: 8px; margin-bottom: 12px; }
+        input[type=text] { flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; font-size: 14px; }
+        button { padding: 8px 16px; border: 1px solid var(--line); background: #fff; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover:not(:disabled) { background: var(--bg); }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        .counter { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; min-height: 34px;
+                border: 1px solid var(--line); border-radius: 4px; padding: 10px; background: var(--bg); }
+        .tag { display: inline-flex; align-items: center; gap: 8px;
+               background: #fff; border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; font-size: 13px; }
+        .tag button { border: 0; background: none; padding: 0 2px; color: var(--muted); font-size: 15px; line-height: 1; }
+        .tag button:hover { color: var(--danger); background: none; }
+        .empty { color: var(--muted); font-size: 13px; }
+        .msg { margin-top: 12px; padding: 10px 12px; border-radius: 4px; font-size: 14px; display: none; }
+        .msg.error { display: block; background: #fdecea; color: var(--danger); }
+        .msg.info  { display: block; background: #eaf3fb; color: #1e5f9e; }
+        .skeleton { color: var(--muted); font-size: 14px; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>파일 확장자 차단</h1>
+    <p class="desc">파일확장자에 따라 특정 형식의 파일을 첨부하거나 전송하지 못하도록 제한합니다.</p>
+
+    <section>
+        <h2>고정 확장자</h2>
+        <div id="fixed" class="fixed-list"><span class="skeleton">불러오는 중…</span></div>
+    </section>
+
+    <section>
+        <h2>커스텀 확장자</h2>
+        <div class="row">
+            <input type="text" id="input" maxlength="20" placeholder="확장자 입력 (영문 소문자·숫자, 최대 20자)" disabled>
+            <button id="add" disabled>+ 추가</button>
+        </div>
+        <div class="counter"><span id="count">-</span> / <span id="limit">-</span></div>
+        <div id="tags" class="tags"><span class="empty">불러오는 중…</span></div>
+        <div id="msg" class="msg"></div>
+    </section>
+</main>
+
+<script>
+    const API = '/api/extensions';
+    const $ = id => document.getElementById(id);
+    let limit = 200;
+
+    function showMsg(text, type = 'error') {
+      const el = $('msg');
+      el.textContent = text;            // ★ innerHTML 금지 — 저장형 XSS 방어
+      el.className = 'msg ' + type;
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.className = 'msg'; }, 4000);
+    }
+
+    async function api(path, options) {
+      const res = await fetch(path, options);
+      if (res.status === 204) return null;
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.message ?? `요청 실패 (${res.status})`);
+      return body;
+    }
+
+    function renderFixed(items) {
+      const box = $('fixed');
+      box.textContent = '';
+      items.forEach(it => {
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = it.blocked;
+        cb.dataset.name = it.name;
+        cb.addEventListener('change', () => toggleFixed(cb));
+        label.append(cb, document.createTextNode(it.name));   // ★ textNode
+        box.append(label);
+      });
+    }
+
+    function renderCustom(items) {
+      const box = $('tags');
+      box.textContent = '';
+      if (!items.length) {
+        const s = document.createElement('span');
+        s.className = 'empty';
+        s.textContent = '등록된 커스텀 확장자가 없습니다.';
+        box.append(s);
+      } else {
+        items.forEach(it => {
+          const tag = document.createElement('span');
+          tag.className = 'tag';
+          const name = document.createElement('span');
+          name.textContent = it.name;                          // ★ textContent
+          const del = document.createElement('button');
+          del.textContent = '×';
+          del.title = `${it.name} 삭제`;
+          del.addEventListener('click', () => removeCustom(it.name));
+          tag.append(name, del);
+          box.append(tag);
+        });
+      }
+      $('count').textContent = items.length;
+      $('limit').textContent = limit;
+      $('input').disabled = $('add').disabled = items.length >= limit;
+      if (items.length >= limit) showMsg(`최대 ${limit}개까지 등록할 수 있습니다.`, 'info');
+    }
+
+    async function load() {
+      try {
+        const data = await api(API);
+        limit = data.customLimit;
+        $('input').maxLength = data.maxNameLength;
+        renderFixed(data.fixed);
+        renderCustom(data.custom);
+        $('input').disabled = $('add').disabled = data.custom.length >= limit;
+      } catch (e) {
+        $('fixed').textContent = '';
+        $('tags').textContent = '';
+        showMsg('목록을 불러오지 못했습니다. 새로고침해 주세요.');
+      }
+    }
+
+    async function toggleFixed(cb) {
+      const prev = !cb.checked;
+      cb.disabled = true;
+      try {
+        await api(`${API}/fixed/${encodeURIComponent(cb.dataset.name)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blocked: cb.checked })
+        });
+      } catch (e) {
+        cb.checked = prev;               // ★ 저장 실패 시 화면을 DB 상태로 되돌림
+        showMsg(e.message);
+      } finally {
+        cb.disabled = false;
+      }
+    }
+
+    async function addCustom() {
+      const value = $('input').value.trim();
+      if (!value) return;
+      $('add').disabled = true;
+      try {
+        await api(`${API}/custom`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: value })
+        });
+        $('input').value = '';
+        await load();                    // ★ 서버 상태를 진실의 원천으로
+      } catch (e) {
+        showMsg(e.message);
+      } finally {
+        $('add').disabled = false;
+      }
+    }
+
+    async function removeCustom(name) {
+      try {
+        await api(`${API}/custom/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        await load();
+      } catch (e) {
+        showMsg(e.message);
+      }
+    }
+
+    $('add').addEventListener('click', addCustom);
+    $('input').addEventListener('keydown', e => { if (e.key === 'Enter') addCustom(); });
+    load();
+</script>
+</body>
+</html>
