@@ -26,3 +26,21 @@ kjh@kjhui-MacBookPro ext-blocker-probe % curl -s $BASE/api/probe/status | jq '{t
 ]
 }
 
+kjh@kjhui-MacBookPro ext-blocker % curl -s $BASE/api/probe/status | jq '{tmpFileCount, tmpFiles, uptimeSeconds}'
+{
+"tmpFileCount": 0,
+"tmpFiles": [],
+"uptimeSeconds": 133
+}
+
+kjh@kjhui-MacBookPro ext-blocker % curl -i -F "file=@test_10mb.bin" $BASE/api/probe/upload
+HTTP/2 200
+content-type: application/json
+date: Fri, 31 Jul 2026 08:13:44 GMT
+server: railway-hikari
+x-railway-request-id: tpufwUD0R2GbOVa9ljLL4A
+content-length: 160
+x-hikari-trace: hnd1.df23
+x-railway-edge: hnd1
+
+{"originalFilename":"test_10mb.bin","declaredContentType":"application/octet-stream","size":0,"savedPath":"/tmp/probe/2206fb35-fc28-432d-9733-ad68932b8d7d.bin"}%      
